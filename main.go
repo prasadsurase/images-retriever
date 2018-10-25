@@ -9,20 +9,12 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"time"
+
+	"github.com/dchest/uniuri"
 )
 
 func main() {
 	root := "/Users/prasad/Downloads/Takeout_2/Google_Photos/"
-	// files, err := ioutil.ReadDir(root)
-	// if err != nil {
-	// 	fmt.Println("Unable to open directory")
-	// 	log.Fatal(err)
-	// }
-
-	// for _, file := range files {
-	// 	fmt.Println(file.Name())
-	// }
 
 	files := []string{}
 	// filepath.Walk is the function which lists all the nested directories and the files in those directories.
@@ -71,36 +63,53 @@ func handleJSONFile(path *string) error {
 		return err
 	}
 	json.Unmarshal(fileData, &data)
+	fmt.Println("************************** JSON data *************************")
+	fmt.Println(data)
 	go parseData(data)
-
 	return nil
 }
 
 func parseData(data map[string]interface{}) error {
-	fmt.Println(data["url"])
 	if data["url"] != nil && data["url"] != "" {
-		url := data["url"]
-		resp, err := http.Get(url.(string))
-		if err != nil {
-			log.Fatal(err)
-			return err
-		}
-
-		defer resp.Body.Close()
-
-		//open a file for writing
-		file, err := os.Create("/Users/prasad/images" + string(time.Now().UnixNano()) + ".jpg")
-		defer file.Close()
-		if err != nil {
-			log.Fatal(err)
-			return err
-		}
-		// Use io.Copy to just dump the response body to the file. This supports huge files
-		_, err = io.Copy(file, resp.Body)
-		if err != nil {
-			log.Fatal(err)
-			return err
-		}
+		fmt.Println("---------------------------==================---------------------------------")
+		url := data["url"].(string)
+		fmt.Println(url)
+		go saveFile(url)
 	}
+	return nil
+}
+
+func saveFile(url string) error {
+	fmt.Println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+	fmt.Println("saveFile: ", url)
+	resp, err := http.Get(url)
+	fmt.Println("Response:", resp)
+	if err != nil {
+		fmt.Println("Error:", err)
+		log.Fatal(err)
+		return err
+	}
+
+	fmt.Println("Resp:", resp)
+	defer resp.Body.Close()
+
+	//open a file for writing
+	file, err := os.Create("/Users/prasad/images/" + uniuri.New() + ".jpg")
+	fmt.Println("Saved file:", file)
+	defer file.Close()
+	if err != nil {
+		fmt.Println("Error:", err)
+		log.Fatal(err)
+		return err
+	}
+	fmt.Println("New File:", file)
+	// Use io.Copy to just dump the response body to the file. This supports huge files
+	_, err = io.Copy(file, resp.Body)
+	if err != nil {
+		fmt.Println("Error:", err)
+		log.Fatal(err)
+		return err
+	}
+	fmt.Println("Saved file:", file)
 	return nil
 }
