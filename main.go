@@ -3,13 +3,13 @@ package main
 import (
   "encoding/json"
   "fmt"
-  "io"
   "io/ioutil"
   "log"
   "net/http"
   "os"
   "path/filepath"
   "sync"
+  "time"
 
   "github.com/dchest/uniuri"
 )
@@ -17,7 +17,8 @@ import (
 var urlsCount int
 
 func main() {
-  root := "/Users/prasad/Downloads/Takeout_2/Google_Photos/"
+  // root := "/Users/prasad/Downloads/Takeout_2/Google_Photos/"
+  root := "/Users/prasad/Desktop/Lohagad"
   var wg sync.WaitGroup
 
   files := []string{}
@@ -95,38 +96,49 @@ func parseData(fileWG *sync.WaitGroup, data map[string]interface{}) error {
 }
 
 func saveFile(parseWG *sync.WaitGroup, url string) error {
+  urlsCount++
   fmt.Println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
   fmt.Println("saveUrl: ", url)
-  resp, err := http.Get(url)
-  fmt.Println("Response:", resp)
-  if (err != nil) && (resp.StatusCode != 200) {
-    fmt.Println("Error:", err)
-    log.Fatal(err)
-    return err
+  fmt.Println("start Http Get ``````````````````````````````")
+  tr := &http.Transport{
+    MaxIdleConns:       100,
+    IdleConnTimeout:    30 * time.Second,
+    DisableCompression: true,
   }
+  client := &http.Client{Transport: tr}
+  resp, err := client.Get(url)
+  fmt.Println("done Http Get ``````````````````````````````")
+  fmt.Println("Response:", resp)
+  // if (err != nil) && (resp.StatusCode != 200) {
+  // 	fmt.Println("Error:", err)
+  // 	log.Fatal(err)
+  // 	return err
+  // }
 
   fmt.Println("Resp:", resp)
   defer resp.Body.Close()
   defer parseWG.Done()
 
   //open a file for writing
-  file, err := os.Create("/Users/prasad/images/" + uniuri.New() + ".jpg")
+  // file, err := os.Create("/Users/prasad/Desktop/golang_images/" + uniuri.New() + ".jpg")
   // fmt.Println("Saved file:", *file)
-  defer file.Close()
-  if err != nil {
-    fmt.Println("Error:", err)
-    log.Fatal(err)
-    return err
-  }
-  fmt.Println("Created New File:", *file)
+  // defer file.Close()
+  // if err != nil {
+  // 	fmt.Println("Error:", err)
+  // 	log.Fatal(err)
+  // 	return err
+  // }
+  // fmt.Println("Created New File:", *file)
   // Use io.Copy to just dump the response body to the file. This supports huge files
-  size, err := io.Copy(file, resp.Body)
+  // size, err := io.Copy(file, resp.Body)
+  data, err := ioutil.ReadAll(resp.Body)
+  err = ioutil.WriteFile("/Users/prasad/Desktop/golang_images/"+uniuri.New()+".jpg", data, os.FileMode(0777))
   if err != nil {
     fmt.Println("Error:", err)
     log.Fatal(err)
     return err
   }
-  urlsCount++
-  fmt.Println("Saved file:", *file, ", Size:", size)
+  fmt.Println()
+  // fmt.Println("Saved file:", *file, ", Size:", size)
   return nil
 }
