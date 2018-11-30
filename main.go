@@ -20,14 +20,18 @@ var imgUrlsCount int
 var videoUrlsCount int
 var failedRespUrlsCount int
 
+// accept a folder path that consists of json files. The json files contain the 'url' to the images/videos. Use these
+// urls to download the images/videos.
 func main() {
   root := "/Users/prasad/Downloads/Takeout/Google_Photos/"
   // root := "/Users/prasad.surase/Desktop/Lohagad"
   var wg sync.WaitGroup
 
+  //All json files found in the specified folder.
   files := []string{}
   // filepath.Walk is the function which lists all the nested directories and the files in those directories.
   err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+    // error incase the provided folder path doesnt exist
     if err != nil {
       log.Panicln("Something went wrong in: ", path)
       log.Fatal(err)
@@ -45,6 +49,7 @@ func main() {
       // fmt.Println("File:", path)
     case mode.IsRegular():
       ext := filepath.Ext(path)
+      // if the file has json extension, add it to the list of files and send it for parsing.
       if ext == ".json" {
         files = append(files, path)
         wg.Add(1)
@@ -60,6 +65,7 @@ func main() {
     log.Fatal(err)
   }
   wg.Wait()
+  // display summary
   fmt.Println("Files count:", len(files))
   fmt.Println("Urls Retrieved:", imgUrlsCount)
   fmt.Println("Vides Urls:", videoUrlsCount)
@@ -72,6 +78,8 @@ func handleJSONFile(wg *sync.WaitGroup, path string) error {
   var fileWG sync.WaitGroup
   ext := filepath.Ext(path)
   fmt.Println("File:", path, ", Extension:", ext)
+
+  // parse the file using the provided path
   fileData, err := ioutil.ReadFile(path)
   if err != nil {
     fmt.Println(err)
@@ -83,16 +91,23 @@ func handleJSONFile(wg *sync.WaitGroup, path string) error {
   // fmt.Println("************************** JSON data *************************")
   // fmt.Println(data)
   fileWG.Add(1)
+
+  // call goroutine to parse the data(incase the data is too large)
   go parseData(&fileWG, data)
   fileWG.Wait()
   return nil
 }
 
+
+// parse the json data. As of now, we only take the 'url' key-value from parsed data. Incase the data is array, we need
+// to gather all the 'url' key-value pairs.
 func parseData(fileWG *sync.WaitGroup, data map[string]interface{}) error {
   var parseWG sync.WaitGroup
   if data["url"] != nil && data["url"] != "" {
     url := data["url"].(string)
     parseWG.Add(1)
+
+    // call go routine to download the image/video using the url
     go saveFile(&parseWG, url)
     time.Sleep(600 * time.Millisecond)
   }
@@ -101,48 +116,7 @@ func parseData(fileWG *sync.WaitGroup, data map[string]interface{}) error {
   return nil
 }
 
-// func saveFile(parseWG *sync.WaitGroup, url string) error {
-// 	if strings.Contains(url, "video-downloads") {
-// 		fmt.Println("Video url: ", url)
-// 		return nil
-// 	}
-// 	tr := &http.Transport{
-// 		MaxIdleConns:       10,
-// 		IdleConnTimeout:    30 * time.Second,
-// 		DisableCompression: true,
-// 	}
-// 	client := &http.Client{Transport: tr}
-// 	// fmt.Println("Url: ", url)
-
-// 	resp, err := client.Get(url)
-// 	// fmt.Println("Resp:", resp)
-
-// 	if resp == nil {
-// 		fmt.Println("Response was nil for url:", url)
-// 		return nil
-// 	}
-
-// 	if (err != nil) || (resp.StatusCode != http.StatusOK) {
-// 		fmt.Println("Error:", err)
-// 		fmt.Println("Url:", url)
-// 		log.Fatal(err)
-// 		return nil
-// 	}
-
-// 	defer resp.Body.Close()
-// 	defer parseWG.Done()
-
-// 	data, err := ioutil.ReadAll(resp.Body)
-// 	err = ioutil.WriteFile("/Users/prasad/Desktop/golang_images/"+uniuri.New()+".jpg", data, os.FileMode(0777))
-// 	if err != nil {
-// 		fmt.Println("Error:", err)
-// 		log.Fatal(err)
-// 		return nil
-// 	}
-// 	urlsCount++
-// 	return nil
-// }
-
+// download the image/video using the provided url
 func saveFile(parseWG *sync.WaitGroup, url string) error {
   if strings.Contains(url, "video-downloads") {
     fmt.Println("Video url: ", url)
@@ -157,6 +131,7 @@ func saveFile(parseWG *sync.WaitGroup, url string) error {
   client := &http.Client{Transport: tr}
   // fmt.Println("Url: ", url)
 
+  //get the data using url
   resp, err := client.Get(url)
   // fmt.Println("Resp:", resp)
 
@@ -176,7 +151,7 @@ func saveFile(parseWG *sync.WaitGroup, url string) error {
   defer resp.Body.Close()
   defer parseWG.Done()
 
-  // open file for writing
+  // open file for writing and dump response data in the newly created file.
   file, err := os.Create("/Users/prasad/Desktop/golang_images/" + uniuri.New() + ".jpg")
   // fmt.Println("Saved file:", *file)
   if err != nil {
